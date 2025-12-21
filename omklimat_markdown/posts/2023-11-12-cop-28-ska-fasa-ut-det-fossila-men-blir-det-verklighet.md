@@ -1,0 +1,13 @@
+---
+title: COP 28 ska fasa ut det fossila, men blir det verklighet???
+date: 2023-11-12
+slug: cop-28-ska-fasa-ut-det-fossila-men-blir-det-verklighet
+status: publish
+author: Lars
+categories:
+  - Okategoriserade
+source_url: "https://omklimat.se/cop-28-ska-fasa-ut-det-fossila-men-blir-det-verklighet/"
+wp_id: 1531
+---
+**Nästa klimatmöte i Dubai inträffar snart . Kan man egentligen hoppas på någon framgång för klimatförändringen? Ett oljeland-som styr agendan-ser säkert till att det går ”lagom” fort med utfasningen av fossila bränslen. Lite förvånande är faktiskt att rekordmånga delegater har anmält sig till mötet och flyger självklart dit. Har vi inte kommit längre med den digitala tekniken? Eller ser många det som en betald semesterresa? Hur som helst så är det stora möjligheter till ett nytt fiasko.  Man ska nämligen kolla hur det går med minskningen av C02 sedan beslutet i Paris. Det går inte så bra, men nu ställer man upp nya mål i stället. EU ska minska sina nettoutsläpp av växthusgaser med minst 55 procent fram till 2030 jämfört med 1990 års nivåer och uppnå klimatneutralitet senast 2050. Ser man på verkligheten i Europa så borras det för fullt i havet efter ny olja och både England och Norge räknar med ökande utsläpp. Ja , faktiskt också Sverige, som gång på gång talar om hur bra vi är och så blir verkligheten en helt annan. Inte bättre globalt heller. Trots löften om netto nollutsläpp planerar världens länder att producera mer än dubbelt så mycket fossila bränslen än vad som är i linje med klimatmålen. I stället för att fasa ut fossila bränslen planerar länder att öka produktion av kol, olja och gas, enligt en ny rapport. Varför inte säga som det är- 1,5 gradersmålet är kört och lever vi i dagens situation på randen till ännu större krig, så är 2 gradersmålet det också. Allt större belopp måste avsättas i budgeten för anpassning och skador på samhället. Vår regering gör raka motsatsen och satsar minst 400 miljarder på något så diffust som smr kärnkraftverk 10-15 år i framtiden. Vad är då smr? Jo, betydligt mindre kärnkraftverk, som inget land ännu har i drift och som kan byggas i alla kommuner, men då måste det kommunala vetot plockas bort. De drivs, som de stora, med uran bränsle och blir säkert ett önskemål för terrorister. Problemen är samma som det stora- strålning och lagring. Dessutom inte billigare. Då kan man tycka att vindkraftparker till havs- som ger snabb och mycket billigare energi vore betydligt bättre.Dessutom är lagring av vind/solenergi inte längre något problem.**
+[![](http://omklimat.se/wp-content/uploads/2023/11/a7c8bb37-cbf8-4b76-8072-d9c0a306734d.jpeg.jpg)](http://omklimat.se/wp-content/uploads/2023/11/a7c8bb37-cbf8-4b76-8072-d9c0a306734d.jpeg.jpg)
