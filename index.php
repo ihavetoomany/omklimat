@@ -64,6 +64,7 @@ function getExcerpt($content, $length = 200) {
             <?php if (empty($posts)): ?>
                 <p class="no-posts">Inga inlägg än. Kom tillbaka snart!</p>
             <?php else: ?>
+                <h2 class="articles-subtitle">Alla artiklar:</h2>
                 <div class="posts-list">
                     <?php foreach ($posts as $post): ?>
                         <article class="post-preview">
