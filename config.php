@@ -18,10 +18,7 @@ define('FEATURED_IMAGE_QUALITY', 85);
 // Hash generated with: password_hash('Rosenberg9', PASSWORD_DEFAULT)
 define('ADMIN_PASSWORD_HASH', '$2y$10$7lFcbG0cC5z8PmymXJvTqOMRSzl19g6QJ4In6V1Y6Z9ThoqzAMHOS');
 
-// Session configuration
-session_start();
-
-// Session security hardening
+// Session configuration - MUST be set before session_start()
 ini_set('session.cookie_httponly', 1);
 // Only enable secure cookies if HTTPS is being used
 if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
@@ -29,6 +26,9 @@ if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
 }
 ini_set('session.use_strict_mode', 1);
 ini_set('session.cookie_samesite', 'Strict');
+
+// Start session after configuring it
+session_start();
 
 // Regenerate session ID periodically
 if (!isset($_SESSION['created'])) {
