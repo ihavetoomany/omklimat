@@ -9,9 +9,10 @@ logVisit('index');
 
 $db = getDB();
 
-// Get all published posts, newest first
+// Get all published posts, newest first (but numbered: oldest = 1, newest = highest)
 $stmt = $db->query("SELECT id, title, content, slug, featured_image, created_at FROM posts WHERE status = 'published' ORDER BY created_at DESC");
 $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$totalPosts = count($posts);
 
 // Function to get excerpt (first 200 characters)
 function getExcerpt($content, $length = 200) {
@@ -60,13 +61,16 @@ function getExcerpt($content, $length = 200) {
             </div>
         </header>
         
+        <?php if (!empty($posts)): ?>
+            <h2 class="articles-subtitle">Alla artiklar:</h2>
+        <?php endif; ?>
+        
         <main>
             <?php if (empty($posts)): ?>
                 <p class="no-posts">Inga inlägg än. Kom tillbaka snart!</p>
             <?php else: ?>
-                <h2 class="articles-subtitle">Alla artiklar:</h2>
                 <div class="posts-list">
-                    <?php foreach ($posts as $post): ?>
+                    <?php foreach ($posts as $index => $post): ?>
                         <article class="post-preview">
                             <?php if ($post['featured_image']): ?>
                                 <a href="post.php?slug=<?php echo htmlspecialchars($post['slug']); ?>" class="featured-image-link">
@@ -78,7 +82,10 @@ function getExcerpt($content, $length = 200) {
                             <h2><a href="post.php?slug=<?php echo htmlspecialchars($post['slug']); ?>">
                                 <?php echo htmlspecialchars($post['title']); ?>
                             </a></h2>
-                            <time class="post-date"><?php echo formatDate($post['created_at']); ?></time>
+                            <div class="post-date-wrapper">
+                                <span class="article-number"><?php echo $totalPosts - $index; ?></span>
+                                <time class="post-date"><?php echo formatDate($post['created_at']); ?></time>
+                            </div>
                             <p class="post-excerpt"><?php echo htmlspecialchars(getExcerpt($post['content'])); ?></p>
                             <a href="post.php?slug=<?php echo htmlspecialchars($post['slug']); ?>" class="read-more">Läs mer →</a>
                         </article>
