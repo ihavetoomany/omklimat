@@ -14,13 +14,40 @@ define('FEATURED_IMAGE_WIDTH', 1200);
 define('FEATURED_IMAGE_HEIGHT', 630);
 define('FEATURED_IMAGE_QUALITY', 85);
 
-// Admin password - CHANGE THIS to a secure password!
-// Use password_hash() to generate: password_hash('your_password', PASSWORD_DEFAULT)
-// For now, default password is 'admin' - CHANGE IT!
-define('ADMIN_PASSWORD_HASH', password_hash('admin', PASSWORD_DEFAULT));
+// Admin password - Password: Rosenberg9
+// Hash generated with: password_hash('Rosenberg9', PASSWORD_DEFAULT)
+define('ADMIN_PASSWORD_HASH', '$2y$10$7lFcbG0cC5z8PmymXJvTqOMRSzl19g6QJ4In6V1Y6Z9ThoqzAMHOS');
 
 // Session configuration
 session_start();
+
+// Session security hardening
+ini_set('session.cookie_httponly', 1);
+// Only enable secure cookies if HTTPS is being used
+if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
+    ini_set('session.cookie_secure', 1);
+}
+ini_set('session.use_strict_mode', 1);
+ini_set('session.cookie_samesite', 'Strict');
+
+// Regenerate session ID periodically
+if (!isset($_SESSION['created'])) {
+    $_SESSION['created'] = time();
+} else if (time() - $_SESSION['created'] > 1800) { // 30 minutes
+    session_regenerate_id(true);
+    $_SESSION['created'] = time();
+}
+
+// Set session timeout (30 minutes of inactivity)
+if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
+    session_unset();
+    session_destroy();
+    if (strpos($_SERVER['REQUEST_URI'] ?? '', 'admin') !== false) {
+        header('Location: login.php?timeout=1');
+    }
+    exit;
+}
+$_SESSION['last_activity'] = time();
 
 // Ensure data and uploads directories exist
 if (!file_exists(DATA_DIR)) {
@@ -352,5 +379,38 @@ function getTopArticles($limit = 10) {
     $stmt->execute([$limit]);
     
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Generate CSRF token
+ */
+function generateCSRFToken() {
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Verify CSRF token
+ */
+function verifyCSRFToken($token) {
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token ?? '');
+}
+
+/**
+ * Error reporting - disable in production
+ * Set ENVIRONMENT=development to see errors during development
+ */
+if (getenv('ENVIRONMENT') !== 'development') {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 0);
+    ini_set('log_errors', 1);
+    ini_set('error_log', __DIR__ . '/data/php_errors.log');
+} else {
+    // Development mode - show errors
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
+    ini_set('log_errors', 1);
 }
 

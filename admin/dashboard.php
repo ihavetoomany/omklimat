@@ -9,6 +9,12 @@ $db = getDB();
 
 // Handle delete action
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
+    // Verify CSRF token
+    if (!isset($_GET['csrf_token']) || !verifyCSRFToken($_GET['csrf_token'])) {
+        header('Location: dashboard.php?error=invalid_request');
+        exit;
+    }
+    
     $id = (int)$_GET['delete'];
     
     // Get post to delete featured image
@@ -31,6 +37,12 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
 
 // Handle publish action
 if (isset($_GET['publish']) && is_numeric($_GET['publish'])) {
+    // Verify CSRF token
+    if (!isset($_GET['csrf_token']) || !verifyCSRFToken($_GET['csrf_token'])) {
+        header('Location: dashboard.php?error=invalid_request');
+        exit;
+    }
+    
     $id = (int)$_GET['publish'];
     
     // Update post status to published
@@ -336,11 +348,11 @@ $topArticles = getTopArticles(10);
                                 <div class="action-buttons">
                                     <a href="edit.php?id=<?php echo $post['id']; ?>" class="btn btn-secondary">Redigera</a>
                                     <?php if (($post['status'] ?? 'draft') === 'draft'): ?>
-                                        <a href="?publish=<?php echo $post['id']; ?>" 
+                                        <a href="?publish=<?php echo $post['id']; ?>&csrf_token=<?php echo generateCSRFToken(); ?>" 
                                            class="btn btn-success" 
                                            onclick="return confirm('Vill du publicera detta inlägg?');">Publicera</a>
                                     <?php endif; ?>
-                                    <a href="?delete=<?php echo $post['id']; ?>" 
+                                    <a href="?delete=<?php echo $post['id']; ?>&csrf_token=<?php echo generateCSRFToken(); ?>" 
                                        class="btn btn-danger" 
                                        onclick="return confirm('Är du säker på att du vill radera detta inlägg?');">Radera</a>
                                 </div>

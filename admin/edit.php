@@ -5,6 +5,9 @@
 require_once '../config.php';
 requireLogin(); // Ensure user is logged in
 
+// Generate CSRF token
+$csrfToken = generateCSRFToken();
+
 $db = getDB();
 
 $post = null;
@@ -31,18 +34,22 @@ $success = '';
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = trim($_POST['title'] ?? '');
-    $content = trim($_POST['content'] ?? '');
-    $deleteImage = isset($_POST['delete_image']);
-    // Determine status based on which button was clicked
-    $status = isset($_POST['publish']) ? 'published' : 'draft';
-    
-    // Validation
-    if (empty($title)) {
-        $error = 'Titel krävs.';
-    } elseif (empty($content)) {
-        $error = 'Innehåll krävs.';
+    // Verify CSRF token
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+        $error = 'Ogiltig begäran. Försök igen.';
     } else {
+        $title = trim($_POST['title'] ?? '');
+        $content = trim($_POST['content'] ?? '');
+        $deleteImage = isset($_POST['delete_image']);
+        // Determine status based on which button was clicked
+        $status = isset($_POST['publish']) ? 'published' : 'draft';
+        
+        // Validation
+        if (empty($title)) {
+            $error = 'Titel krävs.';
+        } elseif (empty($content)) {
+            $error = 'Innehåll krävs.';
+        } else {
         // Handle featured image upload
         $featuredImage = null;
         if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
@@ -105,6 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+    }
+}
 }
 
 // Pre-fill form if editing
@@ -279,6 +288,7 @@ $currentStatus = $post['status'] ?? 'draft';
         <?php endif; ?>
         
         <form method="POST" action="" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="<?php echo $csrfToken; ?>">
             <div class="form-group">
                 <label for="title">Titel</label>
                 <input type="text" 

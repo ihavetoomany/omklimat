@@ -12,18 +12,37 @@ if (isLoggedIn()) {
 
 $error = '';
 
+// Rate limiting - max 5 attempts per 15 minutes
+if (!isset($_SESSION['login_attempts'])) {
+    $_SESSION['login_attempts'] = 0;
+    $_SESSION['login_attempt_time'] = time();
+}
+
+// Reset attempts after 15 minutes
+if (time() - $_SESSION['login_attempt_time'] > 900) {
+    $_SESSION['login_attempts'] = 0;
+    $_SESSION['login_attempt_time'] = time();
+}
+
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $password = $_POST['password'] ?? '';
-    
-    // Verify password
-    // Note: You need to update ADMIN_PASSWORD_HASH in config.php with your actual password hash
-    if (password_verify($password, ADMIN_PASSWORD_HASH)) {
-        $_SESSION['admin_logged_in'] = true;
-        header('Location: dashboard.php');
-        exit;
+    // Check if too many attempts
+    if ($_SESSION['login_attempts'] >= 5) {
+        $error = 'För många inloggningsförsök. Försök igen om 15 minuter.';
     } else {
-        $error = 'Felaktigt lösenord. Försök igen.';
+        $password = $_POST['password'] ?? '';
+        
+        // Verify password
+        if (password_verify($password, ADMIN_PASSWORD_HASH)) {
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['login_attempts'] = 0; // Reset on success
+            $_SESSION['last_activity'] = time();
+            header('Location: dashboard.php');
+            exit;
+        } else {
+            $_SESSION['login_attempts']++;
+            $error = 'Felaktigt lösenord. Försök igen.';
+        }
     }
 }
 ?>
