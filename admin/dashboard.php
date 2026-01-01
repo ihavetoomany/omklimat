@@ -140,8 +140,11 @@ $topArticles = getTopArticles(10);
             background: #f5f5f5;
             font-weight: 600;
         }
+        .posts-table tbody tr {
+            background: #f5f5f5;
+        }
         .posts-table tr:hover {
-            background: #f9f9f9;
+            background: #f0f0f0;
         }
         .action-buttons {
             display: flex;
