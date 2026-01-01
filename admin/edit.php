@@ -135,6 +135,12 @@ $currentStatus = $post['status'] ?? 'draft';
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <style>
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
         .admin-header {
             display: flex;
             justify-content: space-between;
