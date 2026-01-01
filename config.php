@@ -1,0 +1,280 @@
+<?php
+/**
+ * Configuration file for the blog
+ * Edit these settings as needed
+ */
+
+// Database configuration
+define('DB_PATH', __DIR__ . '/data/blog.db');
+define('DATA_DIR', __DIR__ . '/data');
+define('UPLOADS_DIR', __DIR__ . '/uploads');
+
+// Featured image settings - adjust size as needed
+define('FEATURED_IMAGE_WIDTH', 1200);
+define('FEATURED_IMAGE_HEIGHT', 630);
+define('FEATURED_IMAGE_QUALITY', 85);
+
+// Admin password - CHANGE THIS to a secure password!
+// Use password_hash() to generate: password_hash('your_password', PASSWORD_DEFAULT)
+// For now, default password is 'admin' - CHANGE IT!
+define('ADMIN_PASSWORD_HASH', password_hash('admin', PASSWORD_DEFAULT));
+
+// Session configuration
+session_start();
+
+// Ensure data and uploads directories exist
+if (!file_exists(DATA_DIR)) {
+    mkdir(DATA_DIR, 0755, true);
+}
+if (!file_exists(UPLOADS_DIR)) {
+    mkdir(UPLOADS_DIR, 0755, true);
+}
+
+/**
+ * Get database connection
+ * Creates the database and tables if they don't exist
+ */
+function getDB() {
+    $db = new PDO('sqlite:' . DB_PATH);
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    
+    // Create posts table if it doesn't exist
+    $db->exec("CREATE TABLE IF NOT EXISTS posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        slug TEXT UNIQUE NOT NULL,
+        featured_image TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+    
+    // Add featured_image column if it doesn't exist (for existing databases)
+    try {
+        $db->exec("ALTER TABLE posts ADD COLUMN featured_image TEXT");
+    } catch (PDOException $e) {
+        // Column already exists, ignore error
+    }
+    
+    // Add status column if it doesn't exist (draft or published)
+    $columnAdded = false;
+    try {
+        $db->exec("ALTER TABLE posts ADD COLUMN status TEXT DEFAULT 'draft'");
+        $columnAdded = true;
+    } catch (PDOException $e) {
+        // Column already exists, ignore error
+    }
+    
+    // Check if migration flag exists
+    $migrationDone = false;
+    try {
+        $checkStmt = $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'");
+        if ($checkStmt->fetch()) {
+            $migrationStmt = $db->query("SELECT COUNT(*) as count FROM migrations WHERE name = 'set_existing_posts_published'");
+            $result = $migrationStmt->fetch(PDO::FETCH_ASSOC);
+            $migrationDone = $result && $result['count'] > 0;
+        }
+    } catch (PDOException $e) {
+        // Migrations table doesn't exist yet
+    }
+    
+    // When column is first added, set all existing posts to 'published' (backward compatibility)
+    if ($columnAdded) {
+        try {
+            $db->exec("UPDATE posts SET status = 'published'");
+            // Create migrations table and mark this migration as done
+            try {
+                $db->exec("CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, executed_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+                $db->exec("INSERT OR IGNORE INTO migrations (name) VALUES ('set_existing_posts_published')");
+            } catch (PDOException $e) {
+                // Ignore error
+            }
+        } catch (PDOException $e) {
+            // Ignore error
+        }
+    } else if (!$migrationDone) {
+        // Column already existed - update all draft posts to published (one-time migration)
+        try {
+            $db->exec("UPDATE posts SET status = 'published' WHERE status = 'draft' OR status IS NULL OR status = ''");
+            // Create migrations table and mark this migration as done
+            try {
+                $db->exec("CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, executed_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+                $db->exec("INSERT OR IGNORE INTO migrations (name) VALUES ('set_existing_posts_published')");
+            } catch (PDOException $e) {
+                // Ignore error
+            }
+        } catch (PDOException $e) {
+            // Ignore error
+        }
+    }
+    
+    // Create index on slug for faster lookups
+    $db->exec("CREATE INDEX IF NOT EXISTS idx_slug ON posts(slug)");
+    
+    return $db;
+}
+
+/**
+ * Check if user is logged in
+ */
+function isLoggedIn() {
+    return isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true;
+}
+
+/**
+ * Require login - redirect to login page if not authenticated
+ */
+function requireLogin() {
+    if (!isLoggedIn()) {
+        header('Location: login.php');
+        exit;
+    }
+}
+
+/**
+ * Generate URL-friendly slug from title
+ */
+function generateSlug($title) {
+    // Convert to lowercase
+    $slug = strtolower($title);
+    // Replace spaces and special characters with hyphens
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+    // Remove leading/trailing hyphens
+    $slug = trim($slug, '-');
+    return $slug;
+}
+
+/**
+ * Format date for display
+ */
+function formatDate($date) {
+    return date('F j, Y', strtotime($date));
+}
+
+/**
+ * Upload and resize featured image
+ * Returns filename on success, false on failure
+ */
+function uploadFeaturedImage($file, $postId = null) {
+    // Check if file was uploaded
+    if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
+        return false;
+    }
+    
+    // Validate file type
+    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    
+    if (!in_array($mimeType, $allowedTypes)) {
+        return false;
+    }
+    
+    // Generate unique filename
+    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $filename = 'featured_' . ($postId ? $postId . '_' : '') . time() . '_' . uniqid() . '.' . $extension;
+    $filepath = UPLOADS_DIR . '/' . $filename;
+    
+    // Load image based on type
+    switch ($mimeType) {
+        case 'image/jpeg':
+        case 'image/jpg':
+            $source = imagecreatefromjpeg($file['tmp_name']);
+            break;
+        case 'image/png':
+            $source = imagecreatefrompng($file['tmp_name']);
+            break;
+        case 'image/gif':
+            $source = imagecreatefromgif($file['tmp_name']);
+            break;
+        case 'image/webp':
+            $source = imagecreatefromwebp($file['tmp_name']);
+            break;
+        default:
+            return false;
+    }
+    
+    if (!$source) {
+        return false;
+    }
+    
+    // Get original dimensions
+    $origWidth = imagesx($source);
+    $origHeight = imagesy($source);
+    
+    // Calculate new dimensions (maintain aspect ratio, crop to fit)
+    $ratio = max(FEATURED_IMAGE_WIDTH / $origWidth, FEATURED_IMAGE_HEIGHT / $origHeight);
+    $newWidth = (int)($origWidth * $ratio);
+    $newHeight = (int)($origHeight * $ratio);
+    
+    // Create new image
+    $destination = imagecreatetruecolor(FEATURED_IMAGE_WIDTH, FEATURED_IMAGE_HEIGHT);
+    
+    // Preserve transparency for PNG/GIF
+    if ($mimeType == 'image/png' || $mimeType == 'image/gif') {
+        imagealphablending($destination, false);
+        imagesavealpha($destination, true);
+        $transparent = imagecolorallocatealpha($destination, 255, 255, 255, 127);
+        imagefill($destination, 0, 0, $transparent);
+    } else {
+        // White background for JPEG
+        $white = imagecolorallocate($destination, 255, 255, 255);
+        imagefill($destination, 0, 0, $white);
+    }
+    
+    // Calculate crop position (center the image)
+    $x = (FEATURED_IMAGE_WIDTH - $newWidth) / 2;
+    $y = (FEATURED_IMAGE_HEIGHT - $newHeight) / 2;
+    
+    // Resize and crop
+    imagecopyresampled($destination, $source, $x, $y, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+    
+    // Save image
+    $saved = false;
+    switch ($mimeType) {
+        case 'image/jpeg':
+        case 'image/jpg':
+            $saved = imagejpeg($destination, $filepath, FEATURED_IMAGE_QUALITY);
+            break;
+        case 'image/png':
+            $saved = imagepng($destination, $filepath, 9);
+            break;
+        case 'image/gif':
+            $saved = imagegif($destination, $filepath);
+            break;
+        case 'image/webp':
+            $saved = imagewebp($destination, $filepath, FEATURED_IMAGE_QUALITY);
+            break;
+    }
+    
+    // Clean up
+    imagedestroy($source);
+    imagedestroy($destination);
+    
+    if ($saved) {
+        return $filename;
+    }
+    
+    return false;
+}
+
+/**
+ * Delete featured image file
+ */
+function deleteFeaturedImage($filename) {
+    if ($filename && file_exists(UPLOADS_DIR . '/' . $filename)) {
+        unlink(UPLOADS_DIR . '/' . $filename);
+    }
+}
+
+/**
+ * Get URL for featured image
+ */
+function getFeaturedImageUrl($filename) {
+    if (!$filename) {
+        return null;
+    }
+    return 'uploads/' . $filename;
+}
+
