@@ -4,6 +4,9 @@
  */
 require_once 'config.php';
 
+// Log visit
+logVisit('index');
+
 $db = getDB();
 
 // Get all published posts, newest first

@@ -3,6 +3,9 @@
  * About page - information about Lars Werner
  */
 require_once 'config.php';
+
+// Log visit
+logVisit('om');
 ?>
 <!DOCTYPE html>
 <html lang="sv">

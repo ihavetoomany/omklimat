@@ -45,6 +45,12 @@ if (isset($_GET['publish']) && is_numeric($_GET['publish'])) {
 $stmt = $db->query("SELECT id, title, slug, featured_image, status, created_at, updated_at FROM posts ORDER BY created_at DESC");
 $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Get visit statistics
+$visitStats = getVisitStats();
+
+// Get top 10 most read articles
+$topArticles = getTopArticles(10);
+
     $message = '';
     if (isset($_GET['deleted'])) {
         $message = 'Inlägg raderat.';
@@ -165,6 +171,78 @@ $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
             padding: 3rem;
             color: #666;
         }
+        .analytics-block {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1.5rem;
+        }
+        .analytics-stat {
+            text-align: center;
+        }
+        .analytics-stat-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .analytics-stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #333;
+        }
+        .top-articles-block {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #eee;
+        }
+        .top-articles-block h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #222;
+            font-weight: 600;
+        }
+        .top-articles-list {
+            list-style: decimal;
+            padding-left: 1.5rem;
+            margin: 0;
+        }
+        .top-articles-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .top-articles-list li:last-child {
+            border-bottom: none;
+        }
+        .top-articles-list li a {
+            color: #333;
+            text-decoration: none;
+            flex: 1;
+        }
+        .top-articles-list li a:hover {
+            color: #555;
+            text-decoration: underline;
+        }
+        .top-articles-count {
+            font-weight: 600;
+            color: #666;
+            font-size: 0.9rem;
+            margin-left: 1rem;
+        }
+        .no-top-articles {
+            color: #666;
+            font-style: italic;
+            padding: 1rem 0;
+        }
     </style>
 </head>
 <body>
@@ -190,6 +268,43 @@ $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <?php if ($message): ?>
             <div class="message"><?php echo htmlspecialchars($message); ?></div>
         <?php endif; ?>
+        
+        <div class="analytics-block">
+            <div class="analytics-stat">
+                <div class="analytics-stat-label">Idag</div>
+                <div class="analytics-stat-value"><?php echo number_format($visitStats['today']); ?></div>
+            </div>
+            <div class="analytics-stat">
+                <div class="analytics-stat-label">Denna vecka</div>
+                <div class="analytics-stat-value"><?php echo number_format($visitStats['week']); ?></div>
+            </div>
+            <div class="analytics-stat">
+                <div class="analytics-stat-label">Denna månad</div>
+                <div class="analytics-stat-value"><?php echo number_format($visitStats['month']); ?></div>
+            </div>
+            <div class="analytics-stat">
+                <div class="analytics-stat-label">Totalt</div>
+                <div class="analytics-stat-value"><?php echo number_format($visitStats['total']); ?></div>
+            </div>
+        </div>
+        
+        <div class="top-articles-block">
+            <h2>10 mest lästa artiklar</h2>
+            <?php if (empty($topArticles)): ?>
+                <div class="no-top-articles">Inga artiklar har besökts än.</div>
+            <?php else: ?>
+                <ol class="top-articles-list">
+                    <?php foreach ($topArticles as $article): ?>
+                        <li>
+                            <a href="../post.php?slug=<?php echo htmlspecialchars($article['slug']); ?>" target="_blank">
+                                <?php echo htmlspecialchars($article['title']); ?>
+                            </a>
+                            <span class="top-articles-count"><?php echo number_format($article['visit_count']); ?> besök</span>
+                        </li>
+                    <?php endforeach; ?>
+                </ol>
+            <?php endif; ?>
+        </div>
         
         <?php if (empty($posts)): ?>
             <div class="no-posts">

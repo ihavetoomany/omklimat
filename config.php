@@ -111,6 +111,16 @@ function getDB() {
     // Create index on slug for faster lookups
     $db->exec("CREATE INDEX IF NOT EXISTS idx_slug ON posts(slug)");
     
+    // Create visits table for analytics
+    $db->exec("CREATE TABLE IF NOT EXISTS visits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        page TEXT NOT NULL,
+        visited_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+    
+    // Create index on visited_at for faster queries
+    $db->exec("CREATE INDEX IF NOT EXISTS idx_visited_at ON visits(visited_at)");
+    
     return $db;
 }
 
@@ -276,5 +286,71 @@ function getFeaturedImageUrl($filename) {
         return null;
     }
     return 'uploads/' . $filename;
+}
+
+/**
+ * Log a visit to the analytics system
+ */
+function logVisit($page) {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("INSERT INTO visits (page) VALUES (?)");
+        $stmt->execute([$page]);
+    } catch (PDOException $e) {
+        // Silently fail - don't break the site if analytics fails
+        error_log("Analytics error: " . $e->getMessage());
+    }
+}
+
+/**
+ * Get visit statistics
+ */
+function getVisitStats() {
+    $db = getDB();
+    $stats = [];
+    
+    // Total visits
+    $stmt = $db->query("SELECT COUNT(*) as total FROM visits");
+    $stats['total'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    
+    // Visits today
+    $stmt = $db->query("SELECT COUNT(*) as today FROM visits WHERE DATE(visited_at) = DATE('now')");
+    $stats['today'] = $stmt->fetch(PDO::FETCH_ASSOC)['today'];
+    
+    // Visits this week
+    $stmt = $db->query("SELECT COUNT(*) as week FROM visits WHERE visited_at >= DATE('now', '-7 days')");
+    $stats['week'] = $stmt->fetch(PDO::FETCH_ASSOC)['week'];
+    
+    // Visits this month
+    $stmt = $db->query("SELECT COUNT(*) as month FROM visits WHERE visited_at >= DATE('now', 'start of month')");
+    $stats['month'] = $stmt->fetch(PDO::FETCH_ASSOC)['month'];
+    
+    return $stats;
+}
+
+/**
+ * Get top 10 most read articles
+ */
+function getTopArticles($limit = 10) {
+    $db = getDB();
+    
+    // Extract slug from page field (format: 'post:slug')
+    // Count visits per slug and join with posts table
+    $stmt = $db->prepare("
+        SELECT 
+            p.id,
+            p.title,
+            p.slug,
+            COUNT(v.id) as visit_count
+        FROM visits v
+        INNER JOIN posts p ON v.page = 'post:' || p.slug
+        WHERE p.status = 'published'
+        GROUP BY p.id, p.title, p.slug
+        ORDER BY visit_count DESC
+        LIMIT ?
+    ");
+    $stmt->execute([$limit]);
+    
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 

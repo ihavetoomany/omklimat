@@ -24,6 +24,9 @@ if (!$post) {
     header('Location: index.php');
     exit;
 }
+
+// Log visit to this post
+logVisit('post:' . $slug);
 ?>
 <!DOCTYPE html>
 <html lang="sv">
