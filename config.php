@@ -25,29 +25,37 @@ if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
     ini_set('session.cookie_secure', 1);
 }
 ini_set('session.use_strict_mode', 1);
-ini_set('session.cookie_samesite', 'Strict');
+// Use Lax instead of Strict for better compatibility
+if (version_compare(PHP_VERSION, '7.3.0', '>=')) {
+    ini_set('session.cookie_samesite', 'Lax');
+}
 
 // Start session after configuring it
-session_start();
-
-// Regenerate session ID periodically
-if (!isset($_SESSION['created'])) {
-    $_SESSION['created'] = time();
-} else if (time() - $_SESSION['created'] > 1800) { // 30 minutes
-    session_regenerate_id(true);
-    $_SESSION['created'] = time();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// Set session timeout (30 minutes of inactivity)
-if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
-    session_unset();
-    session_destroy();
-    if (strpos($_SERVER['REQUEST_URI'] ?? '', 'admin') !== false) {
-        header('Location: login.php?timeout=1');
+// Regenerate session ID periodically - only for logged-in admin users
+if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
+    if (!isset($_SESSION['created'])) {
+        $_SESSION['created'] = time();
+    } else if (time() - $_SESSION['created'] > 1800) { // 30 minutes
+        @session_regenerate_id(true);
+        $_SESSION['created'] = time();
     }
-    exit;
+    
+    // Set session timeout (30 minutes of inactivity)
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
+        session_unset();
+        session_destroy();
+        $isAdminPage = strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/') !== false;
+        if ($isAdminPage && !headers_sent()) {
+            header('Location: login.php?timeout=1');
+            exit;
+        }
+    }
+    $_SESSION['last_activity'] = time();
 }
-$_SESSION['last_activity'] = time();
 
 // Ensure data and uploads directories exist
 if (!file_exists(DATA_DIR)) {
@@ -62,8 +70,11 @@ if (!file_exists(UPLOADS_DIR)) {
  * Creates the database and tables if they don't exist
  */
 function getDB() {
+    // Set SQLite to use WAL mode for better concurrency and to avoid locks
     $db = new PDO('sqlite:' . DB_PATH);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // Enable WAL mode to prevent database locks
+    $db->exec('PRAGMA journal_mode=WAL;');
     
     // Create posts table if it doesn't exist
     $db->exec("CREATE TABLE IF NOT EXISTS posts (
@@ -317,15 +328,43 @@ function getFeaturedImageUrl($filename) {
 
 /**
  * Log a visit to the analytics system
+ * Fails silently to prevent breaking the site if analytics fails
  */
 function logVisit($page) {
     try {
-        $db = getDB();
+        // Validate input
+        if (empty($page) || !is_string($page)) {
+            return false;
+        }
+        
+        // Use a separate database connection for analytics to avoid locks
+        $db = new PDO('sqlite:' . DB_PATH);
+        $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $db->exec('PRAGMA journal_mode=WAL;');
+        $db->exec('PRAGMA busy_timeout=3000;'); // Wait up to 3 seconds if locked
+        
+        // Ensure visits table exists
+        $db->exec("CREATE TABLE IF NOT EXISTS visits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            page TEXT NOT NULL,
+            visited_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )");
+        
         $stmt = $db->prepare("INSERT INTO visits (page) VALUES (?)");
         $stmt->execute([$page]);
-    } catch (PDOException $e) {
+        
+        // Close connection immediately to prevent locks
+        $stmt = null;
+        $db = null;
+        
+        return true;
+    } catch (Exception $e) {
         // Silently fail - don't break the site if analytics fails
-        error_log("Analytics error: " . $e->getMessage());
+        // Only log if error logging is enabled
+        if (ini_get('log_errors')) {
+            error_log("Analytics error: " . $e->getMessage());
+        }
+        return false;
     }
 }
 
