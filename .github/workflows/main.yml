@@ -1,0 +1,35 @@
+name: Deploy to Hostinger via FTP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: 191.96.63.130
+          username: u469138665.bjarne
+          password: ${{ secrets.FTP_PASS_HOSTINGER }}
+          protocol: ftp
+          port: 21
+          local-dir: ./        # roten i ditt repo
+          # Eftersom roten för FTP-kontot är roten för din site:
+          server-dir: ./      
+
+          # Exkludera filer/mappar som INTE ska deployas eller röras
+          exclude: |
+            config.php
+            data/**
+            uploads/**
+            **/.git*
+            **/.github/**
+            **/node_modules/**
