@@ -57,7 +57,7 @@ function getExcerpt($content, $length = 200) {
                 <img src="uploads/author.png" alt="Lars Werner" class="author-image" style="max-width: 100%; height: auto; margin-bottom: 1rem; border-radius: 8px;">
             <?php endif; ?>
             <div class="author-intro">
-                <p>Bloggen skrivs av <strong>Lars Werner</strong>, meteorolog och klimatexpert med över 50 års erfarenhet. Bloggen har nu varit aktiv i snart 15 år och innehåller över 300 artiklar.<br><a href="om.php">Läs mer om författaren →</a></p>
+                <p>Bloggen skrivs av <strong>Lars Werner</strong>, meteorolog och klimatexpert med över 50 års erfarenhet. Bloggen har nu varit aktiv i snart 15 år och innehåller över 300 artiklar.<br><a href="om.php">Läs mer om Lars →</a></p>
             </div>
         </header>
         
