@@ -140,6 +140,11 @@ $topArticles = getTopArticles(10);
             background: #f5f5f5;
             font-weight: 600;
         }
+        .posts-table th:nth-child(3),
+        .posts-table td:nth-child(3) {
+            min-width: 120px;
+            white-space: nowrap;
+        }
         .posts-table tbody tr {
             background: #f5f5f5;
         }
@@ -149,7 +154,21 @@ $topArticles = getTopArticles(10);
         .action-buttons {
             display: flex;
             gap: 0.5rem;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            justify-content: flex-end;
+        }
+        .action-buttons .btn {
+            width: 100px;
+            text-align: center;
+        }
+        .action-buttons .btn-icon {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
         }
         .status-badge {
             display: inline-block;
@@ -217,11 +236,39 @@ $topArticles = getTopArticles(10);
             margin-bottom: 2rem;
             border: 1px solid #eee;
         }
-        .top-articles-block h2 {
+        .top-articles-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
             font-size: 1.5rem;
-            margin-bottom: 1rem;
             color: #222;
             font-weight: 600;
+            margin-bottom: 0;
+        }
+        .top-articles-header:hover {
+            color: #555;
+        }
+        .top-articles-toggle-btn {
+            background: #666;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .top-articles-toggle-btn:hover {
+            background: #888;
+        }
+        .top-articles-content {
+            display: none;
+            margin-top: 1rem;
+        }
+        .top-articles-content.expanded {
+            display: block;
         }
         .top-articles-list {
             list-style: decimal;
@@ -304,21 +351,26 @@ $topArticles = getTopArticles(10);
         </div>
         
         <div class="top-articles-block">
-            <h2>10 mest lästa artiklar</h2>
-            <?php if (empty($topArticles)): ?>
-                <div class="no-top-articles">Inga artiklar har besökts än.</div>
-            <?php else: ?>
-                <ol class="top-articles-list">
-                    <?php foreach ($topArticles as $article): ?>
-                        <li>
-                            <a href="../post.php?slug=<?php echo htmlspecialchars($article['slug']); ?>" target="_blank">
-                                <?php echo htmlspecialchars($article['title']); ?>
-                            </a>
-                            <span class="top-articles-count"><?php echo number_format($article['visit_count']); ?> besök</span>
-                        </li>
-                    <?php endforeach; ?>
-                </ol>
-            <?php endif; ?>
+            <div class="top-articles-header">
+                <span>Se vilka artiklar som har lästs mest</span>
+                <button class="top-articles-toggle-btn" onclick="toggleTopArticles()" id="topArticlesToggleBtn">Visa</button>
+            </div>
+            <div class="top-articles-content" id="topArticlesContent">
+                <?php if (empty($topArticles)): ?>
+                    <div class="no-top-articles">Inga artiklar har besökts än.</div>
+                <?php else: ?>
+                    <ol class="top-articles-list">
+                        <?php foreach ($topArticles as $article): ?>
+                            <li>
+                                <a href="../post.php?slug=<?php echo htmlspecialchars($article['slug']); ?>" target="_blank">
+                                    <?php echo htmlspecialchars($article['title']); ?>
+                                </a>
+                                <span class="top-articles-count"><?php echo number_format($article['visit_count']); ?> besök</span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ol>
+                <?php endif; ?>
+            </div>
         </div>
         
         <?php if (empty($posts)): ?>
@@ -350,14 +402,22 @@ $topArticles = getTopArticles(10);
                             <td>
                                 <div class="action-buttons">
                                     <a href="edit.php?id=<?php echo $post['id']; ?>" class="btn btn-secondary">Redigera</a>
+                                    <a href="?delete=<?php echo $post['id']; ?>&csrf_token=<?php echo generateCSRFToken(); ?>" 
+                                       class="btn btn-danger btn-icon" 
+                                       title="Radera"
+                                       onclick="return confirm('Är du säker på att du vill radera detta inlägg?');">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M5.5 5.5C5.77614 5.5 6 5.72386 6 6V12C6 12.2761 5.77614 12.5 5.5 12.5C5.22386 12.5 5 12.2761 5 12V6C5 5.72386 5.22386 5.5 5.5 5.5Z" fill="currentColor"/>
+                                            <path d="M8 5.5C8.27614 5.5 8.5 5.72386 8.5 6V12C8.5 12.2761 8.27614 12.5 8 12.5C7.72386 12.5 7.5 12.2761 7.5 12V6C7.5 5.72386 7.72386 5.5 8 5.5Z" fill="currentColor"/>
+                                            <path d="M11 6C11 5.72386 10.7761 5.5 10.5 5.5C10.2239 5.5 10 5.72386 10 6V12C10 12.2761 10.2239 12.5 10.5 12.5C10.7761 12.5 11 12.2761 11 12V6Z" fill="currentColor"/>
+                                            <path fill-rule="evenodd" clip-rule="evenodd" d="M14.5 3C14.5 3.27614 14.2761 3.5 14 3.5H13V12.5C13 13.8807 11.8807 15 10.5 15H5.5C4.11929 15 3 13.8807 3 12.5V3.5H2C1.72386 3.5 1.5 3.27614 1.5 3C1.5 2.72386 1.72386 2.5 2 2.5H5C5.26522 2.5 5.51957 2.39464 5.70711 2.20711L6.29289 1.62132C6.48043 1.43379 6.73478 1.32843 7 1.32843H9C9.26522 1.32843 9.51957 1.43379 9.70711 1.62132L10.2929 2.20711C10.4804 2.39464 10.7348 2.5 11 2.5H14C14.2761 2.5 14.5 2.72386 14.5 3ZM4 3.5V12.5C4 13.0523 4.44772 13.5 5 13.5H11C11.5523 13.5 12 13.0523 12 12.5V3.5H4Z" fill="currentColor"/>
+                                        </svg>
+                                    </a>
                                     <?php if (($post['status'] ?? 'draft') === 'draft'): ?>
                                         <a href="?publish=<?php echo $post['id']; ?>&csrf_token=<?php echo generateCSRFToken(); ?>" 
                                            class="btn btn-success" 
                                            onclick="return confirm('Vill du publicera detta inlägg?');">Publicera</a>
                                     <?php endif; ?>
-                                    <a href="?delete=<?php echo $post['id']; ?>&csrf_token=<?php echo generateCSRFToken(); ?>" 
-                                       class="btn btn-danger" 
-                                       onclick="return confirm('Är du säker på att du vill radera detta inlägg?');">Radera</a>
                                 </div>
                             </td>
                         </tr>
@@ -366,6 +426,16 @@ $topArticles = getTopArticles(10);
             </table>
         <?php endif; ?>
     </div>
+    <script>
+        function toggleTopArticles() {
+            const header = document.querySelector('.top-articles-header');
+            const content = document.getElementById('topArticlesContent');
+            const button = document.getElementById('topArticlesToggleBtn');
+            const isExpanded = content.classList.toggle('expanded');
+            header.classList.toggle('expanded');
+            button.textContent = isExpanded ? 'Stäng' : 'Visa';
+        }
+    </script>
 </body>
 </html>
 

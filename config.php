@@ -193,10 +193,22 @@ function generateSlug($title) {
 }
 
 /**
- * Format date for display
+ * Format date for display - Swedish format with short month names
  */
 function formatDate($date) {
-    return date('F j, Y', strtotime($date));
+    $timestamp = strtotime($date);
+    $day = date('j', $timestamp);
+    $month = date('n', $timestamp);
+    $year = date('Y', $timestamp);
+    
+    // Swedish short month names
+    $months = [
+        1 => 'jan', 2 => 'feb', 3 => 'mar', 4 => 'apr',
+        5 => 'maj', 6 => 'jun', 7 => 'jul', 8 => 'aug',
+        9 => 'sep', 10 => 'okt', 11 => 'nov', 12 => 'dec'
+    ];
+    
+    return $day . ' ' . $months[$month] . ' ' . $year;
 }
 
 /**
@@ -305,6 +317,80 @@ function uploadFeaturedImage($file, $postId = null) {
     }
     
     return false;
+}
+
+/**
+ * Upload featured image from base64 data
+ */
+function uploadFeaturedImageFromBase64($base64Data, $postId = null) {
+    if (empty($base64Data)) {
+        return false;
+    }
+    
+    // Remove data URL prefix if present
+    if (strpos($base64Data, 'data:image') === 0) {
+        $base64Data = preg_replace('/^data:image\/\w+;base64,/', '', $base64Data);
+    }
+    
+    // Decode base64 data
+    $imageData = base64_decode($base64Data);
+    if ($imageData === false) {
+        return false;
+    }
+    
+    // Create temporary file
+    $tempFile = tempnam(sys_get_temp_dir(), 'upload_');
+    if ($tempFile === false) {
+        return false;
+    }
+    
+    // Write decoded data to temp file
+    file_put_contents($tempFile, $imageData);
+    
+    // Determine MIME type from image data
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $tempFile);
+    finfo_close($finfo);
+    
+    // Validate MIME type
+    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!in_array($mimeType, $allowedTypes)) {
+        unlink($tempFile);
+        return false;
+    }
+    
+    // Determine extension from MIME type
+    $extension = 'jpg';
+    switch ($mimeType) {
+        case 'image/png':
+            $extension = 'png';
+            break;
+        case 'image/gif':
+            $extension = 'gif';
+            break;
+        case 'image/webp':
+            $extension = 'webp';
+            break;
+    }
+    
+    // Create a file array similar to $_FILES
+    $file = [
+        'name' => 'cropped_image.' . $extension,
+        'type' => $mimeType,
+        'tmp_name' => $tempFile,
+        'error' => UPLOAD_ERR_OK,
+        'size' => filesize($tempFile)
+    ];
+    
+    // Use existing upload function
+    $result = uploadFeaturedImage($file, $postId);
+    
+    // Clean up temp file
+    if (file_exists($tempFile)) {
+        unlink($tempFile);
+    }
+    
+    return $result;
 }
 
 /**

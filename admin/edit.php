@@ -40,7 +40,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $title = trim($_POST['title'] ?? '');
         $content = trim($_POST['content'] ?? '');
-        $deleteImage = isset($_POST['delete_image']);
         // Determine status based on which button was clicked
         $status = isset($_POST['publish']) ? 'published' : 'draft';
         
@@ -52,8 +51,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
         // Handle featured image upload
         $featuredImage = null;
-        if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
-            // Upload new image
+        $deleteImage = isset($_POST['delete_image']) && $_POST['delete_image'] == '1';
+        
+        // Check for cropped image (base64) first, then regular file upload
+        if (!empty($_POST['cropped_image_data'])) {
+            // Upload cropped image from base64
+            $featuredImage = uploadFeaturedImageFromBase64($_POST['cropped_image_data'], $postId);
+            if ($featuredImage === false) {
+                $error = 'Bilduppladdning misslyckades. Kontrollera att bilden är giltig.';
+            } else {
+                // Delete old image if editing
+                if ($isEdit && $post && $post['featured_image']) {
+                    deleteFeaturedImage($post['featured_image']);
+                }
+            }
+        } elseif (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
+            // Upload new image (fallback for direct file upload)
             $featuredImage = uploadFeaturedImage($_FILES['featured_image'], $postId);
             if ($featuredImage === false) {
                 $error = 'Bilduppladdning misslyckades. Kontrollera att filen är en giltig bildfil (JPG, PNG, GIF eller WebP).';
@@ -134,6 +147,9 @@ $currentStatus = $post['status'] ?? 'draft';
     <!-- Quill Editor -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <!-- Cropper.js - Lightweight image cropper -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
     <style>
         .container {
             background: white;
@@ -272,6 +288,109 @@ $currentStatus = $post['status'] ?? 'draft';
             font-size: 0.9rem;
             margin-top: 0.5rem;
         }
+        /* Image Crop Modal Styles */
+        .crop-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .crop-modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+            position: relative;
+        }
+        .crop-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: #333;
+            margin-bottom: 1rem;
+        }
+        .crop-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 1rem;
+        }
+        .crop-preview {
+            margin-top: 1rem;
+            text-align: center;
+        }
+        .crop-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .image-upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 4px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 1rem;
+        }
+        .image-upload-area:hover {
+            border-color: #333;
+            background: #f9f9f9;
+        }
+        .image-upload-area.has-image {
+            border-style: solid;
+            border-color: #4caf50;
+            padding: 1rem;
+        }
+        .image-preview-container {
+            position: relative;
+            display: inline-block;
+        }
+        .image-preview-container img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 4px;
+            display: block;
+        }
+        .image-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-small-danger {
+            background: #d32f2f;
+            color: white;
+        }
+        .btn-small-danger:hover {
+            background: #c62828;
+        }
+        .btn-small-secondary {
+            background: #666;
+            color: white;
+        }
+        .btn-small-secondary:hover {
+            background: #888;
+        }
+        .hidden-file-input {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -307,19 +426,48 @@ $currentStatus = $post['status'] ?? 'draft';
             <div class="form-group">
                 <label for="featured_image">Huvudbild</label>
                 <?php if ($currentImage): ?>
-                    <div class="current-image">
-                        <img src="../<?php echo htmlspecialchars(getFeaturedImageUrl($currentImage)); ?>" alt="Nuvarande huvudbild" style="max-width: 100%; height: auto; border-radius: 4px; margin-bottom: 1rem; max-height: 300px;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                            <input type="checkbox" name="delete_image" value="1">
-                            <span>Radera nuvarande bild</span>
-                        </label>
+                    <div class="current-image-preview" style="margin-bottom: 1rem;">
+                        <img id="current-image-preview" src="../<?php echo htmlspecialchars(getFeaturedImageUrl($currentImage)); ?>" alt="Nuvarande huvudbild" style="width: 100%; height: auto; border-radius: 4px; display: block;">
+                        <div style="margin-top: 0.5rem;">
+                            <button type="button" id="delete-current-image" class="btn-small btn-small-danger">Radera nuvarande bild</button>
+                        </div>
                     </div>
                 <?php endif; ?>
+                <div id="image-upload-container">
+                    <div id="image-upload-area" class="image-upload-area" style="display: none;">
+                        <p style="margin: 0; font-size: 1.1rem;">Klicka för att välja bild</p>
+                        <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">JPG, PNG, GIF eller WebP</p>
+                    </div>
+                    <div id="crop-container" style="display: none; margin-bottom: 1rem;">
+                        <img id="crop-image" style="max-width: 100%; max-height: 400px;">
+                        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button type="button" id="rotate-left" class="btn-small btn-small-secondary" title="Rotera vänster 90°">↺ Rotera vänster</button>
+                                <button type="button" id="rotate-right" class="btn-small btn-small-secondary" title="Rotera höger 90°">↻ Rotera höger</button>
+                            </div>
+                            <div style="flex: 1;"></div>
+                            <div>
+                                <button type="button" id="crop-confirm" class="btn-small btn-primary">Bekräfta beskärning</button>
+                                <button type="button" id="crop-cancel" class="btn-small btn-small-secondary" style="margin-left: 0.5rem;">Avbryt</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="cropped-preview" style="display: none; margin-bottom: 1rem;">
+                        <img id="cropped-preview-img" style="width: 100%; height: auto; border-radius: 4px; display: block;">
+                        <div style="margin-top: 0.5rem;">
+                            <button type="button" id="select-new-image" class="btn-small btn-small-secondary">Välj annan bild</button>
+                            <button type="button" id="remove-image" class="btn-small btn-small-danger" style="margin-left: 0.5rem;">Radera bild</button>
+                        </div>
+                    </div>
+                </div>
                 <input type="file" 
                        id="featured_image" 
                        name="featured_image" 
-                       accept="image/jpeg,image/jpg,image/png,image/gif,image/webp">
-                <p class="help-text">Ladda upp en bild (JPG, PNG, GIF eller WebP). Den kommer automatiskt att ändras till <?php echo FEATURED_IMAGE_WIDTH; ?>x<?php echo FEATURED_IMAGE_HEIGHT; ?>px.</p>
+                       accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                       style="display: none;">
+                <input type="hidden" id="cropped_image_data" name="cropped_image_data">
+                <input type="hidden" id="delete_image" name="delete_image" value="0">
+                <p class="help-text">Ladda upp en bild (JPG, PNG, GIF eller WebP). Du kan beskära bilden innan uppladdning.</p>
             </div>
             
             <div class="form-group">
@@ -371,6 +519,407 @@ $currentStatus = $post['status'] ?? 'draft';
                     // Update hidden textarea with HTML content
                     content.value = htmlContent;
                 });
+            </script>
+            
+            <script>
+                // Simple image upload and crop using Cropper.js
+                document.addEventListener('DOMContentLoaded', function() {
+                    let cropper = null;
+                    let currentImageFile = null;
+                    
+                    const uploadArea = document.getElementById('image-upload-area');
+                    const fileInput = document.getElementById('featured_image');
+                    const cropContainer = document.getElementById('crop-container');
+                    const cropImage = document.getElementById('crop-image');
+                    const croppedPreview = document.getElementById('cropped-preview');
+                    const croppedPreviewImg = document.getElementById('cropped-preview-img');
+                    const croppedImageDataInput = document.getElementById('cropped_image_data');
+                    const deleteImageInput = document.getElementById('delete_image');
+                    const currentImagePreview = document.getElementById('current-image-preview');
+                    const currentImageContainer = document.querySelector('.current-image-preview');
+                    
+                    // Show upload area if no current image
+                    <?php if (!$currentImage): ?>
+                    if (uploadArea) uploadArea.style.display = 'block';
+                    <?php endif; ?>
+                    
+                    // File input change handler
+                    if (fileInput) {
+                        fileInput.addEventListener('change', function(e) {
+                            const file = e.target.files[0];
+                            if (file) {
+                                currentImageFile = file;
+                                const reader = new FileReader();
+                                reader.onload = function(event) {
+                                    if (cropImage) {
+                                        cropImage.src = event.target.result;
+                                        if (uploadArea) uploadArea.style.display = 'none';
+                                        if (cropContainer) cropContainer.style.display = 'block';
+                                        if (croppedPreview) croppedPreview.style.display = 'none';
+                                        if (currentImageContainer) currentImageContainer.style.display = 'none';
+                                        
+                                        // Initialize Cropper.js
+                                        if (typeof Cropper !== 'undefined') {
+                                            if (cropper) {
+                                                cropper.destroy();
+                                            }
+                                            cropper = new Cropper(cropImage, {
+                                                aspectRatio: NaN, // No aspect ratio constraint - free crop
+                                                viewMode: 1,
+                                                dragMode: 'move',
+                                                autoCropArea: 0.8,
+                                                restore: false,
+                                                guides: true,
+                                                center: true,
+                                                highlight: false,
+                                                cropBoxMovable: true,
+                                                cropBoxResizable: true,
+                                                toggleable: false,
+                                                zoomable: true,
+                                                scalable: true,
+                                                rotatable: true,
+                                                responsive: true
+                                            });
+                                        } else {
+                                            alert('Bildverktyget laddas fortfarande. Vänta ett ögonblick och försök igen.');
+                                        }
+                                    }
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        });
+                    }
+                    
+                    // Upload area click handler
+                    if (uploadArea) {
+                        uploadArea.addEventListener('click', function() {
+                            if (fileInput) fileInput.click();
+                        });
+                    }
+                    
+                    // Select new image button
+                    const selectNewImageBtn = document.getElementById('select-new-image');
+                    if (selectNewImageBtn) {
+                        selectNewImageBtn.addEventListener('click', function() {
+                            if (fileInput) fileInput.click();
+                        });
+                    }
+                    
+                    // Rotate left button
+                    const rotateLeftBtn = document.getElementById('rotate-left');
+                    if (rotateLeftBtn) {
+                        rotateLeftBtn.addEventListener('click', function() {
+                            if (cropper) {
+                                cropper.rotate(-90);
+                            }
+                        });
+                    }
+                    
+                    // Rotate right button
+                    const rotateRightBtn = document.getElementById('rotate-right');
+                    if (rotateRightBtn) {
+                        rotateRightBtn.addEventListener('click', function() {
+                            if (cropper) {
+                                cropper.rotate(90);
+                            }
+                        });
+                    }
+                    
+                    // Crop confirm button
+                    const cropConfirmBtn = document.getElementById('crop-confirm');
+                    if (cropConfirmBtn) {
+                        cropConfirmBtn.addEventListener('click', function() {
+                            if (cropper && croppedImageDataInput) {
+                                // Get cropped canvas without fixed dimensions - use whatever was cropped
+                                const canvas = cropper.getCroppedCanvas();
+                                
+                                canvas.toBlob(function(blob) {
+                                    const reader = new FileReader();
+                                    reader.onload = function() {
+                                        croppedImageDataInput.value = reader.result;
+                                        croppedPreviewImg.src = reader.result;
+                                        cropContainer.style.display = 'none';
+                                        croppedPreview.style.display = 'block';
+                                        deleteImageInput.value = '0';
+                                    };
+                                    reader.readAsDataURL(blob);
+                                }, 'image/jpeg', 0.95);
+                            }
+                        });
+                    }
+                    
+                    // Crop cancel button
+                    const cropCancelBtn = document.getElementById('crop-cancel');
+                    if (cropCancelBtn) {
+                        cropCancelBtn.addEventListener('click', function() {
+                            if (cropper) {
+                                cropper.destroy();
+                                cropper = null;
+                            }
+                            cropContainer.style.display = 'none';
+                            <?php if (!$currentImage): ?>
+                            if (uploadArea) uploadArea.style.display = 'block';
+                            <?php else: ?>
+                            if (currentImageContainer) currentImageContainer.style.display = 'block';
+                            <?php endif; ?>
+                            if (fileInput) fileInput.value = '';
+                            currentImageFile = null;
+                        });
+                    }
+                    
+                    // Remove image button
+                    const removeImageBtn = document.getElementById('remove-image');
+                    if (removeImageBtn) {
+                        removeImageBtn.addEventListener('click', function() {
+                            if (confirm('Är du säker på att du vill radera bilden?')) {
+                                croppedPreview.style.display = 'none';
+                                croppedImageDataInput.value = '';
+                                deleteImageInput.value = '1';
+                                <?php if (!$currentImage): ?>
+                                if (uploadArea) uploadArea.style.display = 'block';
+                                <?php endif; ?>
+                            }
+                        });
+                    }
+                    
+                    // Delete current image button
+                    const deleteCurrentImageBtn = document.getElementById('delete-current-image');
+                    if (deleteCurrentImageBtn) {
+                        deleteCurrentImageBtn.addEventListener('click', function() {
+                            if (confirm('Är du säker på att du vill radera den nuvarande bilden?')) {
+                                deleteImageInput.value = '1';
+                                if (currentImageContainer) currentImageContainer.style.display = 'none';
+                                <?php if (!$currentImage): ?>
+                                if (uploadArea) uploadArea.style.display = 'block';
+                                <?php endif; ?>
+                            }
+                        });
+                    }
+                });
+            </script>
+            
+            <script>
+                // Old React code removed - keeping this comment for reference
+                /*
+                function initImageUploadCrop() {
+                        const [imageSrc, setImageSrc] = useState(null);
+                        const [crop, setCrop] = useState({ x: 0, y: 0 });
+                        const [zoom, setZoom] = useState(1);
+                        const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+                        const [showCropModal, setShowCropModal] = useState(false);
+                        const [croppedImageUrl, setCroppedImageUrl] = useState(currentImageUrl || null);
+                        const fileInputRef = useRef(null);
+                        const hiddenFileInput = document.getElementById('featured_image');
+                        const croppedImageDataInput = document.getElementById('cropped_image_data');
+                        const deleteImageInput = document.getElementById('delete_image');
+                        
+                        const aspectRatio = <?php echo number_format((float)FEATURED_IMAGE_WIDTH / (float)FEATURED_IMAGE_HEIGHT, 10, '.', ''); ?>;
+                        
+                        const onCropComplete = useCallback(function(croppedArea, croppedAreaPixels) {
+                            setCroppedAreaPixels(croppedAreaPixels);
+                        }, []);
+                        
+                        const createImage = function(url) {
+                            return new Promise(function(resolve, reject) {
+                                const image = new Image();
+                                image.addEventListener('load', function() { resolve(image); });
+                                image.addEventListener('error', function(error) { reject(error); });
+                                image.setAttribute('crossOrigin', 'anonymous');
+                                image.src = url;
+                            });
+                        };
+                        
+                        const getCroppedImg = function(imageSrc, pixelCrop) {
+                            return createImage(imageSrc).then(function(image) {
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                
+                                canvas.width = pixelCrop.width;
+                                canvas.height = pixelCrop.height;
+                                
+                                ctx.drawImage(
+                                    image,
+                                    pixelCrop.x,
+                                    pixelCrop.y,
+                                    pixelCrop.width,
+                                    pixelCrop.height,
+                                    0,
+                                    0,
+                                    pixelCrop.width,
+                                    pixelCrop.height
+                                );
+                                
+                                return new Promise(function(resolve) {
+                                    canvas.toBlob(function(blob) {
+                                        resolve(blob);
+                                    }, 'image/jpeg', 0.95);
+                                });
+                            });
+                        };
+                        
+                        const handleFileSelect = function(e) {
+                            const file = e.target.files[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = function(event) {
+                                    setImageSrc(event.target.result);
+                                    setShowCropModal(true);
+                                    setZoom(1);
+                                    setCrop({ x: 0, y: 0 });
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        };
+                        
+                        const handleCropComplete = function() {
+                            if (!croppedAreaPixels) return;
+                            
+                            getCroppedImg(imageSrc, croppedAreaPixels).then(function(croppedImage) {
+                                const croppedImageUrl = URL.createObjectURL(croppedImage);
+                                setCroppedImageUrl(croppedImageUrl);
+                                
+                                // Convert blob to base64 for form submission
+                                const reader = new FileReader();
+                                reader.onload = function() {
+                                    const base64 = reader.result;
+                                    croppedImageDataInput.value = base64;
+                                    // Clear the file input since we're using base64
+                                    hiddenFileInput.value = '';
+                                };
+                                reader.readAsDataURL(croppedImage);
+                                
+                                setShowCropModal(false);
+                                if (onImageChange) onImageChange(croppedImageUrl);
+                            }).catch(function(error) {
+                                console.error('Error cropping image:', error);
+                                alert('Ett fel uppstod vid beskärning av bilden.');
+                            });
+                        };
+                        
+                        const handleCancelCrop = function() {
+                            setShowCropModal(false);
+                            setImageSrc(null);
+                            hiddenFileInput.value = '';
+                        };
+                        
+                        const handleDeleteImage = function() {
+                            if (confirm('Är du säker på att du vill radera bilden?')) {
+                                setImageSrc(null);
+                                setCroppedImageUrl(null);
+                                croppedImageDataInput.value = '';
+                                hiddenFileInput.value = '';
+                                deleteImageInput.value = '1';
+                                if (onImageDelete) onImageDelete();
+                            }
+                        };
+                        
+                        const handleSelectNewImage = function() {
+                            if (fileInputRef.current) {
+                                fileInputRef.current.click();
+                            }
+                        };
+                    
+                        if (!Cropper) {
+                            return React.createElement('div', null,
+                                React.createElement('p', { style: { color: '#d32f2f' } }, 'Bildverktyget laddas... Om detta meddelande kvarstår, ladda om sidan.'),
+                                React.createElement('input', {
+                                    ref: fileInputRef,
+                                    type: 'file',
+                                    accept: 'image/jpeg,image/jpg,image/png,image/gif,image/webp',
+                                    onChange: handleFileSelect,
+                                    style: { display: 'none' }
+                                })
+                            );
+                        }
+                        
+                        return React.createElement('div', null,
+                            (showCropModal && imageSrc && Cropper) ? React.createElement('div', { className: 'crop-modal' },
+                                React.createElement('div', { className: 'crop-modal-content' },
+                                    React.createElement('h3', { style: { marginTop: 0 } }, 'Beskär bild'),
+                                    React.createElement('p', { style: { fontSize: '0.9rem', color: '#666', marginBottom: '1rem' } },
+                                        'Dra bilden för att positionera och använd zoom för att justera storleken.'
+                                    ),
+                                    React.createElement('div', { className: 'crop-container' },
+                                        React.createElement(Cropper, {
+                                            image: imageSrc,
+                                            crop: crop,
+                                            zoom: zoom,
+                                            aspect: aspectRatio,
+                                            onCropChange: setCrop,
+                                            onZoomChange: setZoom,
+                                            onCropComplete: onCropComplete
+                                        })
+                                    ),
+                                    React.createElement('div', { style: { marginBottom: '1rem' } },
+                                        React.createElement('label', { style: { display: 'block', marginBottom: '0.5rem' } },
+                                            'Zoom: ' + Math.round(zoom * 100) + '%'
+                                        ),
+                                        React.createElement('input', {
+                                            type: 'range',
+                                            min: 1,
+                                            max: 3,
+                                            step: 0.1,
+                                            value: zoom,
+                                            onChange: function(e) { setZoom(parseFloat(e.target.value)); },
+                                            style: { width: '100%' }
+                                        })
+                                    ),
+                                    React.createElement('div', { className: 'crop-controls' },
+                                        React.createElement('button', {
+                                            type: 'button',
+                                            className: 'btn-small btn-small-secondary',
+                                            onClick: handleCancelCrop
+                                        }, 'Avbryt'),
+                                        React.createElement('button', {
+                                            type: 'button',
+                                            className: 'btn-small btn-primary',
+                                            onClick: handleCropComplete
+                                        }, 'Bekräfta beskärning')
+                                    )
+                                ) : null,
+                            (!showCropModal) ? React.createElement(React.Fragment, null,
+                                croppedImageUrl ? React.createElement('div', { className: 'image-upload-area has-image' },
+                                    React.createElement('div', { className: 'image-preview-container' },
+                                        React.createElement('img', {
+                                            src: croppedImageUrl,
+                                            alt: 'Förhandsgranskning'
+                                        })
+                                    ),
+                                    React.createElement('div', { className: 'image-actions' },
+                                        React.createElement('button', {
+                                            type: 'button',
+                                            className: 'btn-small btn-small-secondary',
+                                            onClick: handleSelectNewImage
+                                        }, 'Välj annan bild'),
+                                        React.createElement('button', {
+                                            type: 'button',
+                                            className: 'btn-small btn-small-danger',
+                                            onClick: handleDeleteImage
+                                        }, 'Radera bild')
+                                    )
+                                ) : React.createElement('div', {
+                                    className: 'image-upload-area',
+                                    onClick: handleSelectNewImage
+                                },
+                                    React.createElement('p', { style: { margin: 0, fontSize: '1.1rem' } },
+                                        'Klicka för att välja bild'
+                                    ),
+                                    React.createElement('p', { style: { margin: '0.5rem 0 0 0', color: '#666', fontSize: '0.9rem' } },
+                                        'JPG, PNG, GIF eller WebP'
+                                    )
+                                ),
+                                React.createElement('input', {
+                                    ref: fileInputRef,
+                                    type: 'file',
+                                    accept: 'image/jpeg,image/jpg,image/png,image/gif,image/webp',
+                                    onChange: handleFileSelect,
+                                    style: { display: 'none' }
+                                })
+                            ) : null
+                        );
+                    }
+                    
+                */
             </script>
             
             <div class="form-actions">

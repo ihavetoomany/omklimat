@@ -1,9 +1,0 @@
-# Protect data folder from direct web access
-# Deny all requests to files in this directory
-<Files "*">
-    Order Allow,Deny
-    Deny from all
-</Files>
-
-
-
