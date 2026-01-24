@@ -689,9 +689,14 @@ $currentStatus = $post['status'] ?? 'draft';
                             if (confirm('Är du säker på att du vill radera den nuvarande bilden?')) {
                                 deleteImageInput.value = '1';
                                 if (currentImageContainer) currentImageContainer.style.display = 'none';
-                                <?php if (!$currentImage): ?>
+                                // Always show upload area when deleting current image
                                 if (uploadArea) uploadArea.style.display = 'block';
-                                <?php endif; ?>
+                                // Hide any other image previews
+                                if (croppedPreview) croppedPreview.style.display = 'none';
+                                if (cropContainer) cropContainer.style.display = 'none';
+                                // Clear any cropped image data
+                                if (croppedImageDataInput) croppedImageDataInput.value = '';
+                                if (fileInput) fileInput.value = '';
                             }
                         });
                     }
