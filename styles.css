@@ -58,6 +58,10 @@ header h1 {
     flex: 1;
 }
 
+header h1.home-title {
+    font-size: 3rem;
+}
+
 .admin-sun-button {
     display: flex;
     align-items: center;
@@ -490,6 +494,10 @@ footer {
     
     header h1 {
         font-size: 1.75rem;
+    }
+    
+    header h1.home-title {
+        font-size: 2rem;
     }
     
     .admin-sun-button {
