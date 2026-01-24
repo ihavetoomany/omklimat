@@ -29,10 +29,10 @@ body {
 /* Header */
 header {
     background: white;
-    padding: 2rem;
+    padding: 1rem 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 header.no-background {
@@ -47,11 +47,11 @@ header.no-background {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
 }
 
 header h1 {
-    font-size: 3.5rem;
+    font-size: 2rem;
     margin-bottom: 0;
     color: #222;
     font-weight: 700;
@@ -62,8 +62,8 @@ header h1 {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: #f5d76e;
     color: #333;
@@ -71,6 +71,7 @@ header h1 {
     transition: all 0.2s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     flex-shrink: 0;
+    align-self: flex-start;
 }
 
 .admin-sun-button:hover {
@@ -84,8 +85,8 @@ header h1 {
 }
 
 .admin-sun-button svg {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
 }
 
 header h1 a {
@@ -97,12 +98,20 @@ header h1 a:hover {
     color: #555;
 }
 
+.header-back-link {
+    margin-top: 0.5rem;
+}
+
+.header-back-link .back-link {
+    font-size: 0.9rem;
+}
+
 /* Author intro */
 .author-intro {
     margin-top: 0;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     padding-top: 0;
-    font-size: 1rem;
+    font-size: 0.9rem;
     color: #555;
     line-height: 1.6;
 }

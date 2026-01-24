@@ -43,7 +43,7 @@ logVisit('post:' . $slug);
     <div class="container">
         <header>
             <div class="header-title-wrapper">
-                <h1>Om klimat</h1>
+                <h1><?php echo htmlspecialchars($post['title']); ?></h1>
                 <a href="admin/login.php" class="admin-sun-button" aria-label="Gå till admin-sidan">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="5"></circle>
@@ -58,11 +58,13 @@ logVisit('post:' . $slug);
                     </svg>
                 </a>
             </div>
+            <div class="header-back-link">
+                <a href="index.php" class="back-link">← Tillbaka till alla inlägg</a>
+            </div>
         </header>
         
         <main>
             <article class="single-post">
-                <h2><?php echo htmlspecialchars($post['title']); ?></h2>
                 <time class="post-date"><?php echo formatDate($post['created_at']); ?></time>
                 
                 <?php if ($post['featured_image']): ?>
