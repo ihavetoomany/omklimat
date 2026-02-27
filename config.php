@@ -8,6 +8,8 @@
 define('DB_PATH', __DIR__ . '/data/blog.db');
 define('DATA_DIR', __DIR__ . '/data');
 define('UPLOADS_DIR', __DIR__ . '/uploads');
+define('POSTHOG_API_KEY', 'phc_5ZrromaBHAha8iILCv2CtogD6Q0toDFt0O9at0bq48t'); // Set to your Project API Key to enable PostHog
+define('POSTHOG_HOST', 'https://eu.i.posthog.com');
 
 // Featured image settings - adjust size as needed
 define('FEATURED_IMAGE_WIDTH', 1200);
@@ -507,6 +509,23 @@ function getTopArticles($limit = 10) {
 }
 
 /**
+ * Render PostHog snippet for public pages.
+ */
+function renderPostHogSnippet() {
+    if (empty(POSTHOG_API_KEY)) {
+        return;
+    }
+
+    $apiKey = json_encode(POSTHOG_API_KEY, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    $host = json_encode(POSTHOG_HOST, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+    echo '<script>';
+    echo '!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once unregister unregister_once alias identify set_config reset opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing start_batch_senders stop_batch_senders".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);';
+    echo 'posthog.init(' . $apiKey . ', { api_host: ' . $host . ' });';
+    echo '</script>';
+}
+
+/**
  * Generate CSRF token
  */
 function generateCSRFToken() {
@@ -538,4 +557,3 @@ if (getenv('ENVIRONMENT') !== 'development') {
     ini_set('display_errors', 1);
     ini_set('log_errors', 1);
 }
-
